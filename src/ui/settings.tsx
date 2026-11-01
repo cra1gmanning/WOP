@@ -21,7 +21,7 @@ export function SettingsScreen() {
         {app.session ? <button type="button" onClick={() => void app.session?.signOut()}>Sign out</button> : null}
       </div>
       <h2>OneDrive folder</h2>
-      <p className="muted">The library file is /{folder || DEFAULT_LIBRARY_ROOT}/_app/library.json. Logs use the same folder. Default is /{DEFAULT_LIBRARY_ROOT}. Rename the folder in OneDrive if you want a different name, then save that name here.</p>
+      <p className="muted">The library file is /{folder || DEFAULT_LIBRARY_ROOT}/_app/library.json. Optional exercise bookmarks for follow-along videos are /{folder || DEFAULT_LIBRARY_ROOT}/_app/chapters.json. Logs use the same folder. Default is /{DEFAULT_LIBRARY_ROOT}. Rename the folder in OneDrive if you want a different name, then save that name here.</p>
       <label className="stack">
         Folder
         <input value={folder} onChange={(event) => setFolder(event.target.value)} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LIBRARY_ROOT, driveContentUrl, encodeDrivePath, libraryFile, normalizeLibraryRoot } from "./paths";
+import { chaptersFile, DEFAULT_LIBRARY_ROOT, driveContentUrl, encodeDrivePath, libraryFile, normalizeLibraryRoot } from "./paths";
 
 describe("drive paths", () => {
   it("defaults the library folder and trims slashes", () => {
@@ -7,6 +7,8 @@ describe("drive paths", () => {
     expect(normalizeLibraryRoot(" /Workouts/ ")).toBe("Workouts");
     expect(normalizeLibraryRoot("")).toBe("Workouts");
     expect(libraryFile("Workouts")).toBe("Workouts/_app/library.json");
+    expect(chaptersFile("Workouts")).toBe("Workouts/_app/chapters.json");
+    expect(chaptersFile("/Custom/")).toBe("Custom/_app/chapters.json");
   });
 
   it("encodes spaces and hashes per segment", () => {

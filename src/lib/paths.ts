@@ -13,6 +13,10 @@ export function libraryFile(root?: string | null): string {
   return `${normalizeLibraryRoot(root)}/_app/library.json`;
 }
 
+export function chaptersFile(root?: string | null): string {
+  return `${normalizeLibraryRoot(root)}/_app/chapters.json`;
+}
+
 export function stateFile(root?: string | null): string {
   return `${normalizeLibraryRoot(root)}/_app/state.json`;
 }

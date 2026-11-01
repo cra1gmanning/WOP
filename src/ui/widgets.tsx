@@ -1,79 +1,171 @@
 import { useEffect, useRef, useState } from "react";
+import { activeChapterIndex } from "../lib/chapters";
 import { setChoices } from "../lib/ladders";
+import { applyMediaSeek, initialSeekMachine, reduceSeek, type SeekMachine } from "../lib/mediaSeek";
 import type { Prescription, ViewItem } from "../types";
+import { ChapterList } from "./chapters";
 import { useApp, type VideoSource } from "./context";
 
 export function VideoPane({ path, title }: { path: string; title: string }) {
-  const { videoSource } = useApp();
+  const { videoSource, chaptersFor } = useApp();
+  const cues = chaptersFor(path);
   const [source, setSource] = useState<VideoSource | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+  const [playhead, setPlayhead] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const tried = useRef(false);
+  const seekRef = useRef<SeekMachine>(initialSeekMachine());
+  const revokeRef = useRef<(() => void) | undefined>(undefined);
+  const generation = useRef(0);
+  const sourceGen = useRef(-1);
 
   const sourceFn = useRef(videoSource);
   sourceFn.current = videoSource;
 
+  function retain(next: VideoSource) {
+    if (revokeRef.current && revokeRef.current !== next.revoke) revokeRef.current();
+    revokeRef.current = next.revoke;
+    sourceGen.current = generation.current;
+    setSource(next);
+  }
+
   useEffect(() => {
-    let dead = false;
-    let revoke: (() => void) | undefined;
+    const gen = generation.current;
+    seekRef.current = initialSeekMachine();
+    sourceGen.current = -1;
+    setPlayhead(0);
+    setCollapsed(false);
     setBusy(true);
     setError(null);
-    tried.current = false;
+    setSource(null);
     sourceFn.current(path)
       .then((next) => {
-        if (dead) {
+        if (generation.current !== gen) {
           next.revoke?.();
           return;
         }
-        revoke = next.revoke;
-        setSource(next);
+        retain(next);
         setBusy(false);
       })
       .catch((reason: unknown) => {
-        if (!dead) {
-          setBusy(false);
-          setError(reason instanceof Error ? reason.message : String(reason));
-        }
+        if (generation.current !== gen) return;
+        setBusy(false);
+        setError(reason instanceof Error ? reason.message : String(reason));
       });
     return () => {
-      dead = true;
-      revoke?.();
+      generation.current += 1;
+      revokeRef.current?.();
+      revokeRef.current = undefined;
     };
   }, [path]);
 
-  async function refresh() {
-    if (tried.current) return;
-    tried.current = true;
-    const currentTime = videoRef.current?.currentTime ?? 0;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const machine = seekRef.current;
+    if (!machine.awaitingUrl && machine.pending == null) return;
+    const decision = reduceSeek(machine, { type: "url-mounted" });
+    seekRef.current = decision.machine;
+    if (decision.apply != null) applyMediaSeek(video, decision.apply);
+  }, [source]);
+
+  async function refreshUrl() {
+    const gen = generation.current;
     try {
-      const next = await videoSource(path, true);
-      setSource(next);
+      const next = await sourceFn.current(path, true);
+      if (generation.current !== gen) {
+        next.revoke?.();
+        return;
+      }
+      retain(next);
       setError(null);
-      requestAnimationFrame(() => {
-        if (videoRef.current) videoRef.current.currentTime = currentTime;
-      });
-    } catch (reason) {
+    } catch (reason: unknown) {
+      if (generation.current !== gen) return;
+      seekRef.current = { ...seekRef.current, awaitingUrl: false };
       setError(reason instanceof Error ? reason.message : String(reason));
     }
   }
 
+  function onMediaError() {
+    if (sourceGen.current !== generation.current) return;
+    const decision = reduceSeek(seekRef.current, { type: "error" });
+    seekRef.current = decision.machine;
+    if (decision.refresh) void refreshUrl();
+  }
+
+  function onSeek(seconds: number) {
+    setCollapsed(false);
+    setPlayhead(seconds);
+    const decision = reduceSeek(seekRef.current, { type: "tap", seconds });
+    seekRef.current = decision.machine;
+    const video = videoRef.current;
+    if (video && decision.apply != null) applyMediaSeek(video, decision.apply);
+  }
+
+  function onTimeUpdate() {
+    const video = videoRef.current;
+    if (!video) return;
+    const decision = reduceSeek(seekRef.current, { type: "time", seconds: video.currentTime });
+    seekRef.current = decision.machine;
+    const next = video.currentTime;
+    setPlayhead((current) => (activeChapterIndex(cues, current) === activeChapterIndex(cues, next) ? current : next));
+  }
+
+  function onSeeked() {
+    const video = videoRef.current;
+    if (!video) return;
+    const decision = reduceSeek(seekRef.current, { type: "seeked", seconds: video.currentTime });
+    seekRef.current = decision.machine;
+    setPlayhead(video.currentTime);
+  }
+
+  const hasChapters = cues.length > 0;
+  const active = activeChapterIndex(cues, playhead);
+
   return (
-    <figure className="video-pane">
-      <figcaption>{title}</figcaption>
-      {source ? (
-        <video
-          ref={videoRef}
-          key={source.src}
-          src={source.src}
-          controls
-          playsInline
-          preload="metadata"
-          onError={() => void refresh()}
-        />
-      ) : (
-        <p className="muted">{busy ? "Opening video…" : error}</p>
-      )}
+    <figure className={hasChapters ? `video-pane has-chapters${collapsed ? " video-collapsed" : ""}` : "video-pane"}>
+      <figcaption>
+        {hasChapters ? (
+          <>
+            <span>{title}</span>
+            <button
+              type="button"
+              className="text"
+              aria-expanded={!collapsed}
+              onClick={() => {
+                setCollapsed((value) => {
+                  if (!value) videoRef.current?.pause();
+                  return !value;
+                });
+              }}
+            >
+              {collapsed ? "Show video" : "Hide video"}
+            </button>
+          </>
+        ) : (
+          title
+        )}
+      </figcaption>
+      <div className="video-slot" hidden={collapsed}>
+        {source ? (
+          <video
+            ref={videoRef}
+            key={source.src}
+            src={source.src}
+            controls
+            playsInline
+            preload="metadata"
+            onError={onMediaError}
+            onTimeUpdate={onTimeUpdate}
+            onSeeked={onSeeked}
+          />
+        ) : (
+          <p className="muted video-fallback">{busy ? "Opening video…" : error}</p>
+        )}
+        {source && error ? <p className="banner error">{error}</p> : null}
+      </div>
+      {hasChapters ? <ChapterList cues={cues} activeIndex={active} onSeek={onSeek} /> : null}
       <p className="path">{path}</p>
     </figure>
   );

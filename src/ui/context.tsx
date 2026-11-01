@@ -4,7 +4,8 @@ import { startAuth, type Session } from "../auth/msal";
 import { idbGet, idbSet, videoClear, videoGet, videoKeys, videoSet } from "../db/idb";
 import { createDrive, fetchVideoBlob, type Drive } from "../graph/drive";
 import { contentSignature, mergeState } from "../lib/merge";
-import { libraryFile, normalizeLibraryRoot, photoFile, stateFile } from "../lib/paths";
+import { EMPTY_CHAPTERS, lookupChapters, parseChapters, type ChapterCue, type ChaptersFile } from "../lib/chapters";
+import { chaptersFile, libraryFile, normalizeLibraryRoot, photoFile, stateFile } from "../lib/paths";
 import type { AppState, Library } from "../types";
 import { createState } from "../state/default";
 import { reducer, type Action } from "../state/reducer";
@@ -30,6 +31,7 @@ export interface AppModel {
   syncStatus: SyncStatus;
   syncError: string | null;
   syncNow: () => Promise<void>;
+  chaptersFor: (relativePath: string) => ChapterCue[];
   videoSource: (relativePath: string, force?: boolean) => Promise<VideoSource>;
   cacheVideos: (items: { path: string; title: string }[], onProgress: (label: string) => void) => Promise<string[]>;
   cachedPaths: string[];
@@ -38,6 +40,8 @@ export interface AppModel {
 }
 
 const Ctx = createContext<AppModel | null>(null);
+
+export { Ctx as AppContext };
 
 export function useApp(): AppModel {
   const value = useContext(Ctx);
@@ -60,6 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [signIn, setSignIn] = useState<() => Promise<void>>(async () => undefined);
   const [library, setLibrary] = useState<Library | null>(null);
+  const [chapters, setChapters] = useState<ChaptersFile>(EMPTY_CHAPTERS);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [state, setState] = useState<AppState>(() => createState());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(preview ? "local" : "local");
@@ -118,11 +123,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function loadChapters(drive: Drive | null) {
+    const root = rootOf(stateRef.current);
+    const cacheKey = `chapters:${root}`;
+    let cached: unknown;
+    try {
+      cached = await idbGet<unknown>(cacheKey);
+      if (cached) setChapters(parseChapters(cached));
+    } catch {
+      cached = undefined;
+    }
+    if (!drive) return;
+    try {
+      const remote = await drive.getJson<unknown>(chaptersFile(root));
+      const parsed = parseChapters(remote);
+      setChapters(parsed);
+      await idbSet(cacheKey, parsed);
+    } catch {
+      if (!cached) setChapters(EMPTY_CHAPTERS);
+    }
+  }
+
   async function loadLibrary(drive: Drive | null) {
+    const chaptersTask = loadChapters(drive);
     const cached = await idbGet<Library>("library");
     if (cached) setLibrary(cached);
     if (!drive) {
       if (!cached) setLibraryError("The library has not been loaded on this device yet.");
+      await chaptersTask;
       return;
     }
     try {
@@ -138,6 +166,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await idbSet("library", remote);
     } catch (error) {
       if (!cached) setLibraryError(message(error));
+    } finally {
+      await chaptersTask;
     }
   }
 
@@ -160,6 +190,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setLibrary(body);
             setConfigured(true);
             setConfigReady(true);
+          }
+          try {
+            const chaptersResponse = await fetch(`${import.meta.env.BASE_URL}preview-chapters.json`);
+            if (chaptersResponse.ok) {
+              const chaptersBody: unknown = await chaptersResponse.json();
+              if (!cancel) setChapters(parseChapters(chaptersBody));
+            }
+          } catch {
+            /* bookmarks file is optional */
           }
         } catch (error) {
           if (!cancel) setLibraryError(message(error));
@@ -235,6 +274,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncStatus,
     syncError,
     syncNow,
+    chaptersFor: (relativePath: string) => lookupChapters(chapters, relativePath),
     videoSource: async (relativePath: string, force = false) => {
       if (preview) {
         throw new Error("Preview mode does not play OneDrive videos. Add the Azure client id and sign in.");
@@ -281,7 +321,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await drive.putBlob(path, blob, blob.type || "image/jpeg");
       dispatch({ type: "habit-profile", photoPath: path });
     },
-  }), [preview, configReady, configured, session, signIn, library, libraryError, state, syncStatus, syncError, cachedPaths]);
+  }), [preview, configReady, configured, session, signIn, library, chapters, libraryError, state, syncStatus, syncError, cachedPaths]);
 
   return <Ctx.Provider value={model}>{children}</Ctx.Provider>;
 }

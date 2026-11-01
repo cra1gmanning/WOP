@@ -40,6 +40,7 @@ The app looks for files under a folder you can change in Settings. The default i
 
 - Library: `/Workouts/_app/library.json`
 - Logs: `/Workouts/_app/state.json`
+- Exercise bookmarks (optional): `/Workouts/_app/chapters.json`
 
 If you use a different folder name, rename it in OneDrive and save the same name in Settings. Do not commit the library file.
 
@@ -54,6 +55,26 @@ npm run generate -- --spec ./spec --out ./library.json
 
 The script looks for `Catalog.csv` in that folder or one directory down. Upload `library.json` to `/Workouts/_app/library.json` (or whatever folder you saved in Settings). Video files stay in that same OneDrive folder, using the relative paths from your source sheet.
 
+## Exercise bookmarks
+
+Follow-along videos can show the exercises in that file. On a phone the list sits under the player. On a wider window it sits beside it. Each row is the exercise name and its start time as `m:ss`. The row for the exercise at the playhead is marked Now. Tap a name to seek there and play. Hide the video when you want the list as a checklist; marks you tick stay on that screen only.
+
+`chapters.json` is optional. If the file is missing, or a video has no entry, the player does not change. Keys are the same relative paths stored on videos in `library.json`. `t` is seconds from the start. `name` is required. `note` is optional.
+
+```json
+{
+  "version": 1,
+  "videos": {
+    "drills/session-a/flow.mp4": [
+      { "t": 0, "name": "Shoulder rolls" },
+      { "t": 95, "name": "Squat hold", "note": "easy pace" }
+    ]
+  }
+}
+```
+
+Upload it next to `library.json`, then tap Reload library. The phone and the PC both read this file. Do not commit it. A bookmark seek uses the playback link already loaded for that video. If that link has expired, the app requests a fresh one and then seeks to the same time.
+
 ## Run it locally
 
 ```bash
@@ -64,7 +85,7 @@ npm run dev
 
 Dev server: `http://localhost:5173/`.
 
-To click through the planner before signing in, generate a library and copy it to `public/preview-library.json` (gitignored), then open `http://localhost:5173/?preview=1`. Preview does not play OneDrive videos.
+To click through the planner before signing in, generate a library and copy it to `public/preview-library.json` (gitignored), then open `http://localhost:5173/?preview=1`. An optional `public/preview-chapters.json` (also gitignored) fills the exercise list. Preview does not play OneDrive videos.
 
 ## Pages
 
@@ -83,7 +104,7 @@ A public repository is the setup that opens on an iPhone without an extra login.
 3. Open the icon and sign in there. The icon does not share storage with a Safari tab.
 4. On Wi-Fi, open Today and tap **Save videos on this phone** before you rely on a weak signal.
 
-iOS can reclaim saved video bytes. Save the current workout, not the whole library. Seeking uses OneDrive's pre-authenticated download URL. The app refreshes that URL after about 45 minutes and again if the player errors.
+iOS can reclaim saved video bytes. Save the current workout, not the whole library. Seeking uses OneDrive's pre-authenticated download URL. The app refreshes that URL after about 45 minutes and again if the player errors. Exercise bookmarks seek the same way, including after that refresh.
 
 On a Windows PC, use any current browser at the same URL. The phone and the PC share logs through `state.json`.
 

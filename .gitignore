@@ -8,7 +8,9 @@ spec/
 *_spec/
 uploads/
 library.json
+chapters.json
 public/preview-library.json
+public/preview-chapters.json
 
 # Video and audio.
 *.mp4
