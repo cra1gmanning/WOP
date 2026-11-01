@@ -1,0 +1,28 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Local source material and generated catalogs. Never commit these.
+spec/
+*_spec/
+uploads/
+library.json
+chapters.json
+public/preview-library.json
+public/preview-chapters.json
+
+# Video and audio.
+*.mp4
+*.webm
+*.mov
+*.mkv
+*.avi
+*.m4v
+*.mp3
+*.wav
+*.flac
+
+# Local env
+.env
+.env.*
