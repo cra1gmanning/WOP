@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { mobilityForStep } from "../lib/ladders";
+import { fileTitle, findVideoLesson, trackRows } from "../lib/lessons";
 import { advanceSlot, draftDay, exerciseById, trackExercises } from "../lib/workout";
 import type { Exercise } from "../types";
 import { uid } from "../state/default";
 import { todayString } from "../lib/dates";
 import { useApp } from "./context";
+import { LessonAttachments, LessonBody, RelatedVideos } from "./lesson";
 import { go } from "./router";
 import { LogSheet, VideoPane } from "./widgets";
 
@@ -16,9 +18,11 @@ export function LibraryScreen() {
   const needle = query.trim().toLowerCase();
   const courses = library.courses.filter((course) => {
     if (!needle) return true;
-    return course.name.toLowerCase().includes(needle)
-      || course.category.toLowerCase().includes(needle)
-      || course.tracks.some((track) => track.exerciseIds.some((id) => exerciseById(library, id)?.name.toLowerCase().includes(needle)));
+    if (course.name.toLowerCase().includes(needle) || course.category.toLowerCase().includes(needle)) return true;
+    return course.tracks.some((track) => trackRows(track).some((row) => {
+      if (row.kind === "exercise") return exerciseById(library, row.id)?.name.toLowerCase().includes(needle) ?? false;
+      return row.title.toLowerCase().includes(needle);
+    }));
   });
   const classes = library.classes.filter((item) => !needle || `${item.title} ${item.description}`.toLowerCase().includes(needle));
   const categories = [...new Set(courses.map((course) => course.category))];
@@ -37,7 +41,7 @@ export function LibraryScreen() {
           {courses.filter((course) => course.category === category).map((course) => (
             <button key={course.id} type="button" className="card day-chip" onClick={() => go({ name: "course", id: course.id })}>
               <strong>{course.name}</strong>
-              <div className="muted">{course.tracks.reduce((sum, track) => sum + track.exerciseIds.length + track.videos.length, 0)} items</div>
+              <div className="muted">{course.tracks.reduce((sum, track) => sum + trackRows(track).length, 0)} items</div>
             </button>
           ))}
         </div>
@@ -63,21 +67,31 @@ export function CourseScreen({ id }: { id: string }) {
       {course.tracks.map((track) => (
         <div key={track.name}>
           <h2>{track.name}</h2>
-          {track.exerciseIds.map((exerciseId) => {
-            const exercise = exerciseById(library, exerciseId);
-            if (!exercise) return null;
+          {trackRows(track).map((row, index) => {
+            if (row.kind === "exercise") {
+              const exercise = exerciseById(library, row.id);
+              if (!exercise) return null;
+              return (
+                <button key={row.id} type="button" className="card day-chip" onClick={() => go({ name: "exercise", id: row.id })}>
+                  <strong>{exercise.level > 0 ? `L${exercise.level} · ` : ""}{exercise.name}</strong>
+                  <div className="muted">{exercise.strengthMastery}{exercise.mobilityName ? ` · ${exercise.mobilityName}` : ""}</div>
+                </button>
+              );
+            }
+            if (row.kind === "video") {
+              return (
+                <button key={`${row.path}-${index}`} type="button" className="card day-chip" onClick={() => go({ name: "exercise", id: `video:${row.path}` })}>
+                  <strong>{row.title}</strong>
+                </button>
+              );
+            }
             return (
-              <button key={exerciseId} type="button" className="card day-chip" onClick={() => go({ name: "exercise", id: exerciseId })}>
-                <strong>{exercise.level > 0 ? `L${exercise.level} · ` : ""}{exercise.name}</strong>
-                <div className="muted">{exercise.strengthMastery}{exercise.mobilityName ? ` · ${exercise.mobilityName}` : ""}</div>
+              <button key={`${row.title}-${index}`} type="button" className="card day-chip" onClick={() => go({ name: "notes", courseId: course.id, title: row.title })}>
+                <strong>{row.title}</strong>
+                <div className="muted">Notes</div>
               </button>
             );
           })}
-          {track.videos.map((video) => (
-            <button key={video.path} type="button" className="card day-chip" onClick={() => go({ name: "exercise", id: `video:${video.path}` })}>
-              <strong>{video.title}</strong>
-            </button>
-          ))}
         </div>
       ))}
     </section>
@@ -134,13 +148,20 @@ export function ExerciseScreen({ id, day, item }: { id: string; day?: string; it
   }, [exercise, prescription, mobility, step, item, slot]);
 
   if (!library) return null;
-  if (video) {
-    const title = video.split("/").pop()?.replace(/\.mp4$/i, "") || "Video";
+  if (id.startsWith("video:")) {
+    if (!video) return <p>That video is not in the library.</p>;
+    const lesson = findVideoLesson(library, video);
+    const title = lesson?.title || fileTitle(video);
     return (
       <section>
-        <button type="button" className="text" onClick={() => go({ name: "library" })}>Library</button>
+        <button type="button" className="text" onClick={() => go(lesson ? { name: "course", id: lesson.courseId } : { name: "library" })}>
+          {lesson ? "Back" : "Library"}
+        </button>
         <h1>{title}</h1>
         <VideoPane path={video} title={title} />
+        <LessonBody html={lesson?.html} description={lesson?.description} />
+        <LessonAttachments attachments={lesson?.attachments ?? []} />
+        <RelatedVideos paths={lesson?.relatedPaths ?? []} />
       </section>
     );
   }

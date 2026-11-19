@@ -120,7 +120,8 @@ export function VideoPane({ path, title }: { path: string; title: string }) {
     setPlayhead(video.currentTime);
   }
 
-  const hasChapters = cues.length > 0;
+  // A single mark is not a chapter list.
+  const hasChapters = cues.length >= 2;
   const active = activeChapterIndex(cues, playhead);
 
   return (

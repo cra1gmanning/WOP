@@ -46,15 +46,47 @@ export interface Exercise {
   slotKey?: string;
 }
 
+export interface LibraryAttachment {
+  title: string;
+  path: string;
+  kind: "image" | "pdf";
+}
+
 export interface CourseVideo {
   title: string;
   path: string;
+  description?: string;
+  html?: string;
+  attachments?: LibraryAttachment[];
+  relatedPaths?: string[];
 }
+
+export type CourseLessonItem =
+  | {
+      kind: "video";
+      title: string;
+      path: string;
+      description?: string;
+      html?: string;
+      attachments?: LibraryAttachment[];
+      relatedPaths?: string[];
+    }
+  | {
+      kind: "text";
+      title: string;
+      path?: never;
+      description?: string;
+      html?: string;
+      attachments?: LibraryAttachment[];
+      relatedPaths?: string[];
+    };
 
 export interface CourseTrack {
   name: string;
   exerciseIds: string[];
   videos: CourseVideo[];
+  /** Ordered lesson list. When present, the course screen prefers this over `videos`. */
+  items?: CourseLessonItem[];
 }
 
 export interface Course {

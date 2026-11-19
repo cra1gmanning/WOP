@@ -5,6 +5,7 @@ import { collectVideos, resolveDay } from "../lib/workout";
 import { useApp } from "./context";
 import { BuildScreen } from "./build";
 import { HistoryScreen } from "./history";
+import { NotesScreen } from "./lesson";
 import { ClassScreen, CourseScreen, ExerciseScreen, LibraryScreen } from "./library";
 import { QuizScreen } from "./quiz";
 import { parseRoute, routeHash, type Route } from "./router";
@@ -86,6 +87,8 @@ function Screen({ route }: { route: Route }) {
       return <HabitScreen />;
     case "lesson":
       return <LessonScreen id={route.id} />;
+    case "notes":
+      return <NotesScreen courseId={route.courseId} title={route.title} />;
     case "settings":
       return <SettingsScreen />;
     case "equipment":

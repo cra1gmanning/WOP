@@ -160,6 +160,24 @@ button.good { background: #163528; color: var(--good); border-color: #245c40; }
   background: transparent;
 }
 .ladder button.on { border-color: var(--lime); color: var(--lime); }
+.lesson-text { white-space: pre-wrap; }
+.lesson-html { overflow-wrap: anywhere; }
+.lesson-html h1 { font-size: 1.4rem; }
+.lesson-html h2 { font-size: 1.2rem; margin: 16px 0 8px; }
+.lesson-html h3, .lesson-html h4 { font-size: 1.05rem; margin: 14px 0 6px; }
+.lesson-html p, .lesson-html ul, .lesson-html ol, .lesson-html blockquote { margin: 8px 0; }
+.lesson-html img { max-width: 100%; height: auto; border-radius: 12px; }
+.lesson-attachments { margin: 12px 0; }
+.attachment-image { margin: 12px 0; }
+.attachment-image img { width: 100%; border-radius: 12px; background: #000; }
+.attachment-file {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+}
 .video-pane video { width: 100%; border-radius: 16px; background: black; max-height: 70dvh; }
 .video-pane .path { color: var(--muted); font-size: 12px; word-break: break-all; }
 .video-slot { min-width: 0; }

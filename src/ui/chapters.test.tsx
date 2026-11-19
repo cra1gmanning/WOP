@@ -14,6 +14,7 @@ const file = parseChapters({
       { t: 0, name: "Shoulder rolls" },
       { t: 95, name: "Squat hold", note: "easy pace" },
     ],
+    "drills/one.mp4": [{ t: 3, name: "Only one" }],
   },
 });
 
@@ -35,6 +36,10 @@ describe("exercise bookmarks on the player", () => {
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
       configurable: true,
       value: vi.fn(() => Promise.resolve()),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      value: vi.fn(),
     });
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -68,6 +73,14 @@ describe("exercise bookmarks on the player", () => {
   function jumpButtons() {
     return [...container.querySelectorAll("button.chapter-jump")] as HTMLButtonElement[];
   }
+
+  it("skips the chapter list when a video has only one mark", async () => {
+    await renderPane("drills/one.mp4");
+    expect(container.querySelector("video")).toBeTruthy();
+    expect(container.textContent).not.toContain("Exercises");
+    expect(container.textContent).not.toContain("Only one");
+    expect(container.textContent).not.toContain("Hide video");
+  });
 
   it("renders nothing extra when the video has no entry", async () => {
     await renderPane("clips/no-bookmarks.mp4");

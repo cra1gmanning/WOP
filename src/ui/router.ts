@@ -11,6 +11,7 @@ export type Route =
   | { name: "history" }
   | { name: "habits" }
   | { name: "lesson"; id: string }
+  | { name: "notes"; courseId: string; title: string }
   | { name: "settings" }
   | { name: "more" }
   | { name: "play"; date: string }
@@ -44,6 +45,8 @@ export function parseRoute(hash: string): Route {
       return { name: "habits" };
     case "lesson":
       return { name: "lesson", id: rest };
+    case "notes":
+      return { name: "notes", courseId: query.get("course") ?? "", title: query.get("title") ?? "" };
     case "settings":
       return { name: "settings" };
     case "more":
@@ -90,6 +93,12 @@ export function routeHash(route: Route): string {
       return "#/habits";
     case "lesson":
       return `#/lesson/${encodeURIComponent(route.id)}`;
+    case "notes": {
+      const query = new URLSearchParams();
+      query.set("course", route.courseId);
+      query.set("title", route.title);
+      return `#/notes?${query.toString()}`;
+    }
     case "settings":
       return "#/settings";
     case "more":
