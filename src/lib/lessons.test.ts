@@ -118,6 +118,35 @@ describe("lesson lookup", () => {
     expect(videoTitle(library, follow)).toBe("Follow clip");
     expect(videoTitle(library, "drills/missing.mp4")).toBe("missing");
   });
+
+  it("prefers the copy that carries exercises when the same path is listed twice", () => {
+    const withDoses = {
+      courses: [
+        {
+          id: "sample-course",
+          tracks: [
+            track({
+              name: "A",
+              videos: [{ title: "Flow", path: flow, description: "short only" }],
+            }),
+            track({
+              name: "B",
+              videos: [{
+                title: "Flow",
+                path: flow,
+                exercises: [{ name: "Hip Circles", dose: "1x60sec", t: 4 }],
+                summaryLine: "  One circuit.  ",
+              }],
+            }),
+          ],
+        },
+      ],
+    } as unknown as Library;
+    const lesson = findVideoLesson(withDoses, flow);
+    expect(lesson?.exercises).toEqual([{ name: "Hip Circles", dose: "1x60sec", t: 4 }]);
+    expect(lesson?.summaryLine).toBe("One circuit.");
+    expect(findTextLesson(library, "sample-course", "Session notes")?.exercises).toEqual([]);
+  });
 });
 
 describe("notes route", () => {

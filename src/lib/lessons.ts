@@ -1,4 +1,5 @@
-import type { CourseLessonItem, CourseTrack, CourseVideo, Library, LibraryAttachment } from "../types";
+import type { CourseLessonItem, CourseTrack, CourseVideo, LessonExercise, Library, LibraryAttachment } from "../types";
+import { readLessonExercises, readSummaryLine } from "./exerciseCues";
 import { normalizeRel } from "./paths";
 
 export interface ResolvedLesson {
@@ -9,6 +10,8 @@ export interface ResolvedLesson {
   html?: string;
   attachments: LibraryAttachment[];
   relatedPaths: string[];
+  exercises: LessonExercise[];
+  summaryLine?: string;
   courseId: string;
 }
 
@@ -79,7 +82,11 @@ function prefer(current: ResolvedLesson | null, next: ResolvedLesson): ResolvedL
 }
 
 function lessonScore(lesson: ResolvedLesson): number {
-  return (lesson.html ? 4 : 0) + (lesson.description ? 2 : 0) + lesson.attachments.length + lesson.relatedPaths.length;
+  return (lesson.html ? 4 : 0)
+    + (lesson.description ? 2 : 0)
+    + (lesson.exercises.length ? 3 : 0)
+    + lesson.attachments.length
+    + lesson.relatedPaths.length;
 }
 
 function legacyRows(track: CourseTrack): TrackRow[] {
@@ -134,7 +141,13 @@ function readItem(entry: unknown): CourseLessonItem | null {
   if (row.kind !== "video") return null;
   const path = typeof row.path === "string" ? row.path.trim() : "";
   if (!path) return null;
-  return { kind: "video", path, ...shared };
+  return {
+    kind: "video",
+    path,
+    ...shared,
+    exercises: readLessonExercises(row.exercises),
+    summaryLine: readSummaryLine(row.summaryLine),
+  };
 }
 
 function presentText(value: unknown): string | undefined {
@@ -172,6 +185,8 @@ function toResolved(courseId: string, item: CourseLessonItem): ResolvedLesson {
     html: item.html,
     attachments: item.attachments ?? [],
     relatedPaths: item.relatedPaths ?? [],
+    exercises: item.kind === "video" ? item.exercises ?? [] : [],
+    summaryLine: item.kind === "video" ? item.summaryLine : undefined,
     courseId,
   };
 }

@@ -52,6 +52,15 @@ export interface LibraryAttachment {
   kind: "image" | "pdf";
 }
 
+export interface LessonExercise {
+  name: string;
+  dose?: string;
+  cue?: string;
+  /** Seconds from the start of this video. Omitted when the exercise is not timed. */
+  t?: number;
+  label?: string;
+}
+
 export interface CourseVideo {
   title: string;
   path: string;
@@ -59,6 +68,8 @@ export interface CourseVideo {
   html?: string;
   attachments?: LibraryAttachment[];
   relatedPaths?: string[];
+  exercises?: LessonExercise[];
+  summaryLine?: string;
 }
 
 export type CourseLessonItem =
@@ -70,6 +81,8 @@ export type CourseLessonItem =
       html?: string;
       attachments?: LibraryAttachment[];
       relatedPaths?: string[];
+      exercises?: LessonExercise[];
+      summaryLine?: string;
     }
   | {
       kind: "text";

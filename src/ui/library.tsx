@@ -158,7 +158,8 @@ export function ExerciseScreen({ id, day, item }: { id: string; day?: string; it
           {lesson ? "Back" : "Library"}
         </button>
         <h1>{title}</h1>
-        <VideoPane path={video} title={title} />
+        {lesson?.summaryLine ? <p className="muted summary-line">{lesson.summaryLine}</p> : null}
+        <VideoPane path={video} title={title} exercises={lesson?.exercises} />
         <LessonBody html={lesson?.html} description={lesson?.description} />
         <LessonAttachments attachments={lesson?.attachments ?? []} />
         <RelatedVideos paths={lesson?.relatedPaths ?? []} />

@@ -1,19 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { activeChapterIndex } from "../lib/chapters";
+import { buildExerciseRows, libraryExercisesWin, timedRows } from "../lib/exerciseCues";
 import { setChoices } from "../lib/ladders";
 import { applyMediaSeek, initialSeekMachine, reduceSeek, type SeekMachine } from "../lib/mediaSeek";
-import type { Prescription, ViewItem } from "../types";
-import { ChapterList } from "./chapters";
+import type { LessonExercise, Prescription, ViewItem } from "../types";
+import { CueRail, ExerciseList } from "./chapters";
 import { useApp, type VideoSource } from "./context";
 
-export function VideoPane({ path, title }: { path: string; title: string }) {
+export function VideoPane({ path, title, exercises }: { path: string; title: string; exercises?: LessonExercise[] }) {
   const { videoSource, chaptersFor } = useApp();
   const cues = chaptersFor(path);
+  const exerciseList = exercises ?? [];
+  const rows = buildExerciseRows(exerciseList, cues);
+  const timed = timedRows(rows);
+  const timedCues = timed.map((row) => ({ t: row.t ?? 0, name: row.name }));
+  const fromLibrary = libraryExercisesWin(exerciseList, cues);
+  const showList = rows.length > 0 && (fromLibrary || timed.length >= 2);
   const [source, setSource] = useState<VideoSource | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [playhead, setPlayhead] = useState(0);
+  const [railTime, setRailTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const seekRef = useRef<SeekMachine>(initialSeekMachine());
   const revokeRef = useRef<(() => void) | undefined>(undefined);
@@ -35,6 +44,8 @@ export function VideoPane({ path, title }: { path: string; title: string }) {
     seekRef.current = initialSeekMachine();
     sourceGen.current = -1;
     setPlayhead(0);
+    setRailTime(0);
+    setDuration(0);
     setCollapsed(false);
     setBusy(true);
     setError(null);
@@ -97,6 +108,7 @@ export function VideoPane({ path, title }: { path: string; title: string }) {
   function onSeek(seconds: number) {
     setCollapsed(false);
     setPlayhead(seconds);
+    setRailTime(seconds);
     const decision = reduceSeek(seekRef.current, { type: "tap", seconds });
     seekRef.current = decision.machine;
     const video = videoRef.current;
@@ -109,7 +121,13 @@ export function VideoPane({ path, title }: { path: string; title: string }) {
     const decision = reduceSeek(seekRef.current, { type: "time", seconds: video.currentTime });
     seekRef.current = decision.machine;
     const next = video.currentTime;
-    setPlayhead((current) => (activeChapterIndex(cues, current) === activeChapterIndex(cues, next) ? current : next));
+    setPlayhead((current) => (activeChapterIndex(timedCues, current) === activeChapterIndex(timedCues, next) ? current : next));
+    setRailTime((current) => (Math.abs(next - current) >= 0.25 ? next : current));
+  }
+
+  function onDuration() {
+    const value = videoRef.current?.duration;
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) setDuration(value);
   }
 
   function onSeeked() {
@@ -120,9 +138,10 @@ export function VideoPane({ path, title }: { path: string; title: string }) {
     setPlayhead(video.currentTime);
   }
 
-  // A single mark is not a chapter list.
-  const hasChapters = cues.length >= 2;
-  const active = activeChapterIndex(cues, playhead);
+  // Chapter fallback still needs two timed rows. A library list can show one row.
+  const hasChapters = timed.length >= 2;
+  const activeTimed = activeChapterIndex(timedCues, playhead);
+  const activeIndex = activeTimed >= 0 ? timed[activeTimed].index : -1;
 
   return (
     <figure className={hasChapters ? `video-pane has-chapters${collapsed ? " video-collapsed" : ""}` : "video-pane"}>
@@ -160,13 +179,18 @@ export function VideoPane({ path, title }: { path: string; title: string }) {
             onError={onMediaError}
             onTimeUpdate={onTimeUpdate}
             onSeeked={onSeeked}
+            onLoadedMetadata={onDuration}
+            onDurationChange={onDuration}
           />
         ) : (
           <p className="muted video-fallback">{busy ? "Opening video…" : error}</p>
         )}
         {source && error ? <p className="banner error">{error}</p> : null}
+        {timed.length >= 1 && duration > 0 ? (
+          <CueRail rows={timed} duration={duration} currentTime={railTime} activeIndex={activeIndex} onSeek={onSeek} />
+        ) : null}
       </div>
-      {hasChapters ? <ChapterList cues={cues} activeIndex={active} onSeek={onSeek} /> : null}
+      {showList ? <ExerciseList rows={rows} activeIndex={activeIndex} onSeek={onSeek} resetKey={path} /> : null}
       <p className="path">{path}</p>
     </figure>
   );

@@ -71,6 +71,7 @@ const library = {
               path: flow,
               description: "Line one\nLine two",
               html: flowHtml,
+              summaryLine: "A short strength circuit.",
               attachments: [
                 { title: "Chart", path: chart, kind: "image" },
                 { title: "Sheet", path: sheet, kind: "pdf" },
@@ -210,6 +211,7 @@ describe("course lessons", () => {
   it("shows body text, attachments, related videos, and chapters on a video lesson", async () => {
     await render(<ExerciseScreen id={`video:${flow}`} />);
     expect(container.querySelector("h1")?.textContent).toBe("Flow");
+    expect(container.querySelector(".summary-line")?.textContent).toBe("A short strength circuit.");
     expect(container.querySelectorAll("video")).toHaveLength(1);
     expect(container.textContent).toContain("Keep this");
     expect(container.textContent).not.toContain("bad()");
@@ -233,5 +235,6 @@ describe("course lessons", () => {
     expect(container.textContent).not.toContain("Exercises");
     expect(container.textContent).not.toContain("Only one");
     expect(container.querySelector(".chapter-jump")).toBeNull();
+    expect(container.querySelector(".summary-line")).toBeNull();
   });
 });
